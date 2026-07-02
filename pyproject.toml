@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "causal-certificate"
+version = "0.1.0"
+description = "A numeric strict-causality (and cross-example independence) certificate for PyTorch sequence models, via vector-Jacobian products."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+authors = [{ name = "Akhilesh Gogikar", email = "gogikar.akhilesh@gmail.com" }]
+keywords = [
+    "pytorch", "causality", "autoregressive", "leakage",
+    "testing", "sequence-models", "certificate", "vjp",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Testing",
+]
+dependencies = ["torch>=1.13"]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.urls]
+Homepage = "https://github.com/Akhilesh-Gogikar/causal-certificate"
+Source = "https://github.com/Akhilesh-Gogikar/causal-certificate"
+Issues = "https://github.com/Akhilesh-Gogikar/causal-certificate/issues"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]

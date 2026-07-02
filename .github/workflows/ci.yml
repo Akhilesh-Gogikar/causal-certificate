@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.12"]   # min supported + latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install torch (CPU) + tooling
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install build twine pytest
+      - name: Install package
+        run: pip install -e .
+      - name: Run strict-causality certificate test
+        run: python tests/test_external_models.py
+      - name: Build + PyPI metadata check
+        run: |
+          python -m build
+          twine check dist/*
