@@ -11,10 +11,13 @@ so your API token never lands in a chat transcript or shell history you don't co
 you cut a GitHub Release — **no API token exists anywhere**, so there is nothing to leak.
 One-time enable after the repo is on GitHub:
 1. PyPI → https://pypi.org/manage/account/publishing/ → add a *pending publisher*:
-   owner `Akhilesh-Gogikar`, repo `causal-certificate`, workflow `publish.yml`.
-   Leave **Environment name blank** — this workflow does not use a GitHub Actions
-   environment (kept simple: fewer fields that have to match exactly).
-2. Bump `version` in `pyproject.toml`, then cut a GitHub Release → CI builds and publishes.
+   owner `Akhilesh-Gogikar`, repo `causal-certificate`, workflow `publish.yml`,
+   environment `pypi`. All fields are case-sensitive and must match exactly —
+   an environment typo (e.g. `pipit` instead of `pypi`) fails with a generic
+   `invalid-publisher` error that gives no hint which field is wrong.
+2. In the GitHub repo, the `pypi` environment is auto-created the first time
+   the workflow runs; you can also pre-create it under Settings → Environments.
+3. Bump `version` in `pyproject.toml`, then cut a GitHub Release → CI builds and publishes.
 
 `.github/workflows/ci.yml` runs the certificate test + `twine check` on every push/PR.
 The manual `twine upload` path below is the fallback if you skip CI.
