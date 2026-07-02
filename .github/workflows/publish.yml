@@ -5,7 +5,7 @@ name: Publish to PyPI
 # NO API token stored anywhere and nothing to leak. Enable it first on PyPI:
 # https://pypi.org/manage/account/publishing/ -> add a pending publisher with
 #   owner = Akhilesh-Gogikar, repo = causal-certificate,
-#   workflow = publish.yml, environment = pypi
+#   workflow = publish.yml   (Environment: leave BLANK — this workflow uses none)
 
 on:
   release:
@@ -14,7 +14,6 @@ on:
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
-    environment: pypi
     permissions:
       id-token: write        # required for Trusted Publishing (OIDC)
     steps:
