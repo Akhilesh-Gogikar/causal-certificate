@@ -1,0 +1,23 @@
+{
+  "title": "causal-certificate: A strict-causality certificate for PyTorch sequence models",
+  "upload_type": "software",
+  "access_right": "open",
+  "license": "MIT",
+  "description": "A numeric strict-causality certificate for PyTorch sequence models. Using one forward pass and a sweep of vector-Jacobian products, it verifies that no output at position t depends on an input at position s > t -- catching the silent future-token and batch-statistic leaks that can inflate autoregressive language-modeling results. Genuinely causal operators certify at exactly zero (no threshold tuning); the tool adds a cross-batch mode for batch-statistic leaks and a random-K training-time monitor. Companion software to the case study on 'block-causal is not position-causal' leaks.",
+  "creators": [
+    { "name": "Gogikar, Akhilesh" }
+  ],
+  "keywords": [
+    "PyTorch",
+    "causality",
+    "autoregressive models",
+    "data leakage",
+    "vector-Jacobian product",
+    "software testing",
+    "reproducibility",
+    "sequence models"
+  ],
+  "related_identifiers": [
+    { "identifier": "https://pypi.org/project/causal-certificate/", "relation": "isIdenticalTo", "scheme": "url" }
+  ]
+}

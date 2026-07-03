@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+title: "causal-certificate: A strict-causality certificate for PyTorch sequence models"
+abstract: >-
+  A numeric strict-causality certificate for PyTorch sequence models. Using one
+  forward pass and a sweep of vector-Jacobian products, it verifies that no
+  output at position t depends on an input at position s > t, catching the silent
+  future-token and batch-statistic leaks that can inflate autoregressive results.
+  Genuinely causal operators certify at exactly zero; includes a cross-batch mode
+  and a random-K training monitor.
+type: software
+authors:
+  - family-names: Gogikar
+    given-names: Akhilesh
+    email: gogikar.akhilesh@gmail.com
+license: MIT
+version: 0.1.0
+date-released: "2026-07-02"
+repository-code: "https://github.com/Akhilesh-Gogikar/causal-certificate"
+url: "https://pypi.org/project/causal-certificate/"
+keywords:
+  - PyTorch
+  - causality
+  - autoregressive models
+  - data leakage
+  - reproducibility
+  - software testing

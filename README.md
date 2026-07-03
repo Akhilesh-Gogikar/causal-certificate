@@ -70,3 +70,13 @@ pytest                      # or: python tests/test_external_models.py
 ```
 The generalization test certifies external causal attention / conv at exactly 0.0,
 and fires on an injected off-by-one mask and a batch-statistic coupling.
+
+## Citation
+
+Machine-readable metadata is in [`CITATION.cff`](CITATION.cff) (GitHub renders a
+"Cite this repository" button from it). Once the repository is archived on Zenodo,
+add the DOI badge here and cite the versioned DOI. Zenodo/citation metadata for the
+archive lives in [`.zenodo.json`](.zenodo.json).
+
+<!-- After the first Zenodo release, paste the badge Zenodo shows for this repo, e.g.:
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXXXX.svg)](https://doi.org/10.5281/zenodo.XXXXXXX) -->

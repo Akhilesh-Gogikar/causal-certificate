@@ -28,3 +28,5 @@ jobs:
           python -m build
       - name: Publish to PyPI (no token — OIDC)
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true   # re-releasing (e.g. to trigger a Zenodo archive) won't fail if the version is already on PyPI
