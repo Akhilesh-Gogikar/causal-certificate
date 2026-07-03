@@ -4,7 +4,7 @@
 [![PyPI](https://img.shields.io/pypi/v/causal-certificate.svg)](https://pypi.org/project/causal-certificate/)
 [![Python versions](https://img.shields.io/pypi/pyversions/causal-certificate.svg)](https://pypi.org/project/causal-certificate/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21151512.svg)](https://doi.org/10.5281/zenodo.21151512)
+[![DOI](https://zenodo.org/badge/1287471007.svg)](https://doi.org/10.5281/zenodo.21151512)
 
 A small, numeric **strict-causality certificate** for PyTorch sequence models.
 One forward pass + `T−1` vector-Jacobian products tells you whether any output at
