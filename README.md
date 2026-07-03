@@ -1,5 +1,10 @@
 # causal-certificate
 
+[![CI](https://github.com/Akhilesh-Gogikar/causal-certificate/actions/workflows/ci.yml/badge.svg)](https://github.com/Akhilesh-Gogikar/causal-certificate/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/causal-certificate.svg)](https://pypi.org/project/causal-certificate/)
+[![Python versions](https://img.shields.io/pypi/pyversions/causal-certificate.svg)](https://pypi.org/project/causal-certificate/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A small, numeric **strict-causality certificate** for PyTorch sequence models.
 One forward pass + `T−1` vector-Jacobian products tells you whether any output at
 position `t` depends on an input at position `s > t` — the silent bug that
