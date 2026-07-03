@@ -4,6 +4,7 @@
 [![PyPI](https://img.shields.io/pypi/v/causal-certificate.svg)](https://pypi.org/project/causal-certificate/)
 [![Python versions](https://img.shields.io/pypi/pyversions/causal-certificate.svg)](https://pypi.org/project/causal-certificate/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21151512.svg)](https://doi.org/10.5281/zenodo.21151512)
 
 A small, numeric **strict-causality certificate** for PyTorch sequence models.
 One forward pass + `T−1` vector-Jacobian products tells you whether any output at
@@ -73,10 +74,9 @@ and fires on an injected off-by-one mask and a batch-statistic coupling.
 
 ## Citation
 
-Machine-readable metadata is in [`CITATION.cff`](CITATION.cff) (GitHub renders a
-"Cite this repository" button from it). Once the repository is archived on Zenodo,
-add the DOI badge here and cite the versioned DOI. Zenodo/citation metadata for the
-archive lives in [`.zenodo.json`](.zenodo.json).
+Archived on Zenodo. Cite the **concept DOI** (always resolves to the latest version):
 
-<!-- After the first Zenodo release, paste the badge Zenodo shows for this repo, e.g.:
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXXXX.svg)](https://doi.org/10.5281/zenodo.XXXXXXX) -->
+> **DOI: [10.5281/zenodo.21151512](https://doi.org/10.5281/zenodo.21151512)**  ·  v0.1.0: `10.5281/zenodo.21151513`
+
+Machine-readable metadata is in [`CITATION.cff`](CITATION.cff) (GitHub renders a
+"Cite this repository" button from it) and [`.zenodo.json`](.zenodo.json).

@@ -15,6 +15,7 @@ authors:
     email: gogikar.akhilesh@gmail.com
 license: MIT
 version: 0.1.0
+doi: 10.5281/zenodo.21151512
 date-released: "2026-07-02"
 repository-code: "https://github.com/Akhilesh-Gogikar/causal-certificate"
 url: "https://pypi.org/project/causal-certificate/"
