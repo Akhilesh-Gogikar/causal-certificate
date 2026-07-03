@@ -51,6 +51,10 @@ an injected off-by-one mask and a batchnorm coupling → flagged.
 - `certify(fn, x, cuts="rand", K=8)` — a cheap **always-on training monitor**;
   a single-pair leak is caught with probability `1 − (1 − 1/(T−1))^K`.
 - `batch_check=True` (default when `B>1`) — adds the cross-batch certificate.
+- `certify_by_perturbation(fn, x)` — the **elementary black-box variant**: perturb a
+  future input, check that earlier outputs don't move. No autograd needed (works on
+  non-differentiable models); `1 + (T−1)` forward passes. Same verdicts as the VJP
+  certificate, and it's the general form of the paper's "Test A" leak detector.
 
 ## Scope & honest attribution
 

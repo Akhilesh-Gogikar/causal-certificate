@@ -21,6 +21,10 @@ We certify it without materializing the O(T^2) Jacobian:
   * random-K mode: K random cuts as a cheap always-on training monitor; a
     single-pair leak is caught with prob 1 - (1 - 1/(T-1))^K.
 
+  * PERTURBATION variant (certify_by_perturbation): the elementary black-box
+    finite-difference counterpart -- perturb a future input position, check that
+    earlier outputs do not move. No autograd needed; 1 + (T-1) forward passes.
+
 This is a numeric certificate on a given architecture/config (generic inputs and
 cotangents), not a symbolic proof. Prior probes it packages: Karpathy's 2019
 temporal backprop check, the per-cut VJP energy of arXiv:2505.22487, and
@@ -49,6 +53,7 @@ class LeakReport:
     exhaustive: bool = True
     batch_checked: bool = False
     threshold: float = 1e-9
+    method: str = "vjp"
     extra: dict = field(default_factory=dict)
 
     @property
@@ -74,7 +79,7 @@ class LeakReport:
     def summary(self):
         mode = "exhaustive" if self.exhaustive else f"random-K={self.cuts_probed}"
         lines = [
-            f"CausalCertificate(T={self.T}, {mode} cuts)",
+            f"CausalCertificate(T={self.T}, method={self.method}, {mode})",
             f"  temporal   : leak={self.temporal_leak:.3e}  frac={self.temporal_fraction:.3e}  "
             f"-> {'STRICTLY CAUSAL' if self.is_strictly_causal else 'LEAK'}",
         ]
@@ -145,6 +150,60 @@ def certify(fn, x, *, cuts="all", K=8, batch_check=True, seq_dim=1, batch_dim=0,
         crossbatch_leak=xb_leak, crossbatch_total=xb_tot,
         cuts_probed=len(taus), exhaustive=(cuts == "all"),
         batch_checked=do_batch, threshold=threshold,
+    )
+
+
+def certify_by_perturbation(fn, x, *, positions="all", K=8, eps=1.0,
+                            seq_dim=1, threshold=1e-9, generator=None):
+    """Black-box finite-difference causality detector: the elementary counterpart
+    to `certify`. For each probed input position s, perturb x at position s and
+    measure how much the outputs at *earlier* positions t < s move. A strictly
+    causal mixer moves them by EXACTLY 0; any movement is a future->past leak.
+    Sweeping every s in 1..T-1 covers every leaky (t < s) pair.
+
+    Needs no autograd (works on non-differentiable models), and structural leaks
+    are detected for any `eps` (a genuinely causal op yields exact-zero movement).
+    Cost: 1 + (probed positions) forward passes -- slower than `certify`'s VJPs and
+    without the cross-batch extension, but maximally simple and black-box. This is
+    the general form of the case study's "Test A" perturbation probe.
+    `positions="rand"` probes K random positions as a cheap monitor.
+    Returns a LeakReport (method="perturbation").
+    """
+    if generator is None:
+        generator = torch.Generator(device="cpu").manual_seed(0)
+    x = x.detach()
+    y0 = fn(x)
+    if not torch.is_tensor(y0):
+        raise TypeError("fn must return a single tensor; wrap multi-output models.")
+    if y0.shape[seq_dim] != x.shape[seq_dim]:
+        raise ValueError(
+            f"certify_by_perturbation assumes equal in/out sequence length along "
+            f"seq_dim={seq_dim}; got x:{x.shape[seq_dim]} y:{y0.shape[seq_dim]}.")
+    T = y0.shape[seq_dim]
+    if T < 2:
+        raise ValueError("need T >= 2 to probe a position.")
+
+    all_s = list(range(1, T))
+    if positions == "rand":
+        k = min(K, len(all_s))
+        perm = torch.randperm(len(all_s), generator=generator)[:k].tolist()
+        probe = sorted(all_s[i] for i in perm)
+    else:
+        probe = all_s
+
+    leak = total = 0.0
+    for s in probe:
+        xp = x.clone()
+        sl = _axis_slice(xp, seq_dim, s, s + 1)
+        xp[sl] = xp[sl] + eps * torch.randn(xp[sl].shape, dtype=xp.dtype, generator=generator)
+        d = fn(xp) - y0
+        total += d.pow(2).sum().item()
+        leak += d[_axis_slice(d, seq_dim, 0, s)].pow(2).sum().item()   # movement at t < s
+
+    return LeakReport(
+        T=T, temporal_leak=leak, temporal_total=total,
+        cuts_probed=len(probe), exhaustive=(positions != "rand"),
+        threshold=threshold, method="perturbation",
     )
 
 

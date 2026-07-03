@@ -14,7 +14,7 @@ import torch.nn.functional as F
 
 # run from source without installing: add the src/ dir to the path
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
-from causal_certificate import certify  # noqa: E402
+from causal_certificate import certify, certify_by_perturbation  # noqa: E402
 
 DT = torch.float64  # certificate is dtype-agnostic; fp32 case tested separately below
 
@@ -69,6 +69,11 @@ def run():
     check("causal depthwise conv", certify(lambda z: causal_conv(z, torch.randn(4, dtype=DT, generator=g)), x), True)
     check("off-by-one MHA (leaks 1 future tok)", certify(lambda z: _mha(z, Wqkv, nh, tri2), x), False)
     check("bidirectional MHA (no mask)", certify(lambda z: _mha(z, Wqkv, nh, nomask), x), False)
+
+    print("Perturbation detector (black-box; same verdicts as the VJP certificate):")
+    check("perturb: causal MHA", certify_by_perturbation(lambda z: _mha(z, Wqkv, nh, tri1), x), True)
+    check("perturb: off-by-one MHA", certify_by_perturbation(lambda z: _mha(z, Wqkv, nh, tri2), x), False)
+    check("perturb: bidirectional MHA", certify_by_perturbation(lambda z: _mha(z, Wqkv, nh, nomask), x), False)
 
     # kill-criterion (a): finite mask + fp32 must NOT false-positive on a genuinely-causal model
     print("False-positive stress (fp32, finite -1e9 mask):")
