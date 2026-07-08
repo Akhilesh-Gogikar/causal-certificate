@@ -1,0 +1,15 @@
+{
+  "function_under_test": "src/akilm/v2/train/submodules/model_blocks.py::causal_wht_blockwise",
+  "torch": "2.2.2",
+  "test_a_future_perturbation_moves_earlier_output": {
+    "leaky_repo_fn": 0.125,
+    "tril_fix": 0.0,
+    "violation": true
+  },
+  "test_b_iid_oracle_bpb": {
+    "leaky_wht": 2.0721,
+    "tril_wht": 4.0021,
+    "no_wht": 4.0029,
+    "floor_log2V": 4.0
+  }
+}
