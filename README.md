@@ -30,7 +30,7 @@ than a matched transformer — a number that reached a provisional patent applic
 before it was found to be a within-block future-token leak. Standard sanity checks
 passed because they probed *across-block* causality; the violation lived *inside*
 blocks. This tool is the check that would have caught it in CI. (Case study &
-full write-up: `papers/causality_leaks/`.)
+full write-up: [`paper/`](paper/).)
 
 ## What it catches (three leak classes)
 
@@ -75,6 +75,21 @@ pytest                      # or: python tests/test_external_models.py
 ```
 The generalization test certifies external causal attention / conv at exactly 0.0,
 and fires on an injected off-by-one mask and a batch-statistic coupling.
+
+## Paper
+
+The companion negative-results paper documenting the case study lives in
+[`paper/`](paper/):
+
+- [`paper/main.pdf`](paper/main.pdf) — compiled paper
+- [`paper/main.tex`](paper/main.tex) — LaTeX source
+- [`paper/arxiv_submission.tar.gz`](paper/arxiv_submission.tar.gz) — arXiv-ready tarball
+
+It forensically traces how a within-block causality leak in a blockwise
+Walsh--Hadamard mixer (AKI/SKC) manufactured a 7.2× bits-per-byte "win",
+why standard sanity checks missed it, and presents the perturbation-based
+strict-causality certificate implemented here as the paper's central original
+contribution.
 
 ## Citation
 
