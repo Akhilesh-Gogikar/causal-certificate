@@ -1,0 +1,297 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{microtype}
+\hypersetup{colorlinks=true, linkcolor=blue!60!black, citecolor=blue!60!black, urlcolor=blue!60!black}
+
+\newcommand{\bpb}{\textsc{bpb}}
+\newcommand{\evid}[1]{\footnote{Evidence: \texttt{#1}}}
+\newcommand{\todoev}[1]{\textcolor{red!70!black}{[to regenerate: #1]}}
+
+\title{Strictly Dominated: A Post-Mortem of a Spectral--Associative Language
+Model, and the In-Block Causality Leak Behind Its $7.2\times$ Headline}
+\author{Akhilesh Gogikar\thanks{Reproduction: the full leak harness runs in
+$\sim$35\,s on CPU via \texttt{python3
+experiments/wht\_causality/confirm\_wht\_unsalvageable.py} in the accompanying
+repository: \texttt{https://github.com/Akhilesh-Gogikar/causal-certificate}.}}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We report a negative result. Over several months we developed AKI
+(\emph{Associative Koopman Imagination}) and SKC (\emph{Spectral Koopman
+Capsules}), a family
+of attention-replacement language-model blocks combining blockwise
+Walsh--Hadamard (WHT) spectral mixing, associative capsule memory, a Koopman-style
+latent rollout, and an episodic ``engram'' sidecar. Early experiments showed a
+headline result of $7.2\times$ lower bits-per-byte than a matched Transformer
+(0.2455 vs.\ 1.7712 \bpb). We show forensically that this result, and every
+below-baseline number produced by the family, is explained by an in-block
+causality leak: a transform that is causal \emph{between} 64-position blocks but
+dense \emph{within} them, so that each position reads inputs from its own
+future. A minimal harness demonstrates that (a) perturbing a future in-block
+position moves earlier outputs, and (b) because two WHT applications with a
+learned diagonal between them form a dyadic (XOR) convolution containing the
+permutation $t \mapsto t \oplus 1$, a two-line model trained on i.i.d.\ tokens
+drives validation \bpb{} to 2.07 --- far below the information-theoretic floor of
+$\log_2 V = 4.0$ --- by literally reading the next token at every even position.
+The only strictly causal repair (lower-triangular masking of the block operator)
+destroys the fast transform and the entire advantage. With the leak fixed,
+matched-pair runs show the architecture was \emph{strictly dominated}: $+0.094$
+\bpb{} worse than a parameter/data/seed-matched Transformer at the longest
+horizon while running $1.3$--$5.7\times$ slower per step. We dissect the
+methodology failures that let a leak survive months of development ---
+proxy-FLOPs ``fairness'' contracts, 10-minute micro-gates, multi-knob
+attribution chaos, stability-via-damping, and CI gates calibrated to the
+contaminated number --- and distill checks that would have caught it in a day.
+\end{abstract}
+
+\section{Introduction}
+Sub-quadratic replacements for attention are an active research area, and
+spectral token mixing is a recurring ingredient. This note documents a
+research program (AKI/SKC) whose central empirical support was an artifact of a
+causality violation, and whose leak-free variants never beat a matched
+Transformer on quality or speed. We publish it because (i) the failure
+mechanism --- a \emph{blockwise} fast transform that looks causal at the block
+level while leaking within blocks --- is easy to reintroduce in any
+FFT/WHT-style mixer for autoregressive models, and passes shape-level and
+loss-goes-down sanity checks; (ii) the exploit mechanism is subtle
+(spectral-domain gating composes into a future-reading permutation, so the leak
+is not just present but \emph{trainable}); and (iii) the process failures are
+generic to compute-constrained architecture research.
+
+Contributions:
+\begin{enumerate}
+  \item A forensic, reproducible demonstration of the in-block WHT causality
+  leak and of its exploitability by SGD (Section~\ref{sec:leak});
+  \item Matched-pair evidence that the strictly causal architecture is
+  dominated on the quality/speed plane (Section~\ref{sec:matched});
+  \item A methodology post-mortem with concrete, low-cost gates ---
+  including a five-minute i.i.d.-token oracle test that bounds any causal
+  model at $\log_2 V$ \bpb{} --- that we argue should precede any headline
+  claim for a new sequence mixer (Section~\ref{sec:method});
+  \item \textbf{Our central original contribution:} a numeric
+  \emph{perturbation-based strict-causality certificate} --- inject
+  perturbations at future positions $t' > t$ and require exact numerical
+  invariance of all outputs at positions $\le t$ --- packaged as a
+  standalone, architecture-agnostic CI tool
+  (\texttt{causal-certificate}). Unlike shape-level or mask-inspection
+  checks, it certifies the realized forward computation, and it is what
+  ultimately detected the leak described here.
+\end{enumerate}
+
+\section{The architecture family, briefly}
+\label{sec:arch}
+First, the names. \textbf{AKI} stands for \emph{Associative Koopman
+Imagination}: \emph{associative} because token content is stored and
+retrieved via outer-product (Hebbian-style) key--value bindings rather than
+pairwise attention; \emph{Koopman} because latent state is advanced by a
+learned, approximately linear operator in a lifted feature space, in the
+spirit of Koopman operator theory for nonlinear dynamics; and
+\emph{imagination} because that operator is rolled forward several steps
+\emph{without consuming new tokens}, producing predicted future latents that
+condition the current output. \textbf{SKC} stands for \emph{Spectral Koopman
+Capsules}: \emph{spectral} because token mixing happens in a Walsh--Hadamard
+transform domain rather than by dot-product attention; \emph{capsules}
+because the associative memory is organized into a bank of small,
+independently gated slots (each a low-rank key--value store) rather than one
+flat matrix. \textbf{AKF} (\emph{Associative Koopman Flow}) names the latent
+rollout module itself, and \textbf{Engram} --- borrowing the neuroscience
+term for a physical memory trace --- is an episodic sidecar that reads
+before it writes, storing compressed summaries of past context outside the
+main residual stream.
+
+The AKI/SKC family (twelve versions, V0--V12) shares one invariant: replace
+dense self-attention with a strict-causal structured state path. The
+load-bearing primitive is \texttt{causal\_wht\_blockwise}: reshape the sequence
+into blocks of 64 positions and apply a normalized Walsh--Hadamard butterfly
+within each block; blocks are combined by a causal decaying scan. Layers use
+the pattern \emph{WHT $\to$ elementwise/gated ops in the spectral domain $\to$
+WHT back}, alongside an associative capsule bank (SKC), a Koopman-flow latent
+rollout (AKF), and a read-before-write episodic memory (Engram). Full version
+genealogy and claim boundaries are preserved in the repository
+(\texttt{docs/architecture/AKI\_VERSIONS\_DETAILED.md}).
+
+\section{The causality leak}
+\label{sec:leak}
+
+\subsection{Mechanism}
+The blockwise WHT applies the full $64\times64$ Hadamard butterfly across all
+positions of each block. It is causal \emph{between} blocks and dense
+\emph{within} them: the output at position $t$ mixes inputs at $t' > t$ up to
+the end of $t$'s block. The blockwise framing is precisely why it survived
+review: block-level dataflow diagrams look causal, and the GPU path (a Triton
+kernel computing the same dense $H x$ per block) inherits the identical leak.
+
+\subsection{Test A: future perturbations move earlier outputs}
+Perturbing in-block position $t'{=}40$ changes the output at positions
+$t<40$ by up to $0.125$ under the repository implementation, and by exactly
+$0.0$ under the lower-triangular-masked variant --- the only strictly causal
+repair.\evid{experiments/wht\_causality/report.json (regenerated; torch 2.2.2,
+seed-pinned)}
+
+\subsection{Test B: the leak is not just present but trainable}
+\label{sec:testb}
+Why did the leak convert into (fictitiously) excellent language modeling?
+Two WHT applications with a per-position diagonal $s$ between them ---
+exactly the layer shape used throughout the family --- compute
+$H\,\mathrm{diag}(s)\,H$, a \emph{dyadic (XOR) convolution}. Choosing $s$ to
+be the Hadamard spectrum of $\delta_1$ yields $y[t] = x[t \oplus 1]$: at every
+even position the mixer outputs the embedding of the \emph{next} token. SGD
+finds this optimum readily. On i.i.d.\ uniform tokens with $V{=}16$, where any
+causal model is information-theoretically pinned at $\log_2 16 = 4.0$ \bpb:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lcc}
+\toprule
+Mixer & val \bpb & vs.\ floor $4.0$\\
+\midrule
+Repository blockwise WHT (leaky) & $\mathbf{2.0721}$ & impossible without future access\\
+Lower-triangular-masked WHT & $4.0021$ & at floor\\
+No WHT (diagonal only) & $4.0029$ & at floor\\
+\bottomrule
+\end{tabular}
+\caption{I.i.d.-token oracle test. The leaky mixer reads token $t{+}1$
+perfectly at even positions ($\approx 2.0$ \bpb{} $=$ half the positions at 0
+bits, half at 4). Deeper stacks of the same primitive reach $\approx 0$
+\bpb.\protect\evid{experiments/wht\_causality/confirm\_wht\_unsalvageable.py}}
+\label{tab:oracle}
+\end{table}
+
+This explains the provisional-patent-era headline (0.2455 vs.\ 1.7712 \bpb,
+``$7.2\times$''): the model was grading itself on an open-book exam.
+
+\subsection{No causal-and-fast-and-spectral repair exists}
+Masking the future entries of the block operator ($H \mapsto
+\mathrm{tril}(H)$) restores causality but destroys the butterfly
+factorization, the $O(B\log B)$ cost, and empirically the entire advantage:
+clean strictly causal re-runs were $+0.09$ to $+0.24$ \bpb{} \emph{worse} than
+baseline.\evid{docs/contribution\_fwht\_causality.md;
+docs/architecture/POST\_MORTEM\_WHY\_NON\_SOTA.md}
+
+\section{Matched evaluation of the leak-free architecture}
+\label{sec:matched}
+With strict causality enforced, paired runs trained the AKI-family architecture
+and a Transformer under one harness with matched parameters, optimizer, data,
+and seed (\texttt{fairness\_contract.json}):
+
+\begin{table}[h]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lrrrrrrr}
+\toprule
+run & steps & AKI \bpb & xfmr \bpb & $\Delta$\bpb & AKI ms/step & xfmr ms/step & slowdown\\
+\midrule
+\texttt{aki\_vs\_transformer\_10k} & 10000 & 1.6576 & 1.5635 & $+0.094$ & 170.6 & 89.7 & $1.9\times$\\
+\texttt{...125m\_fastpath\_d512} & 4351 & 1.6555 & 1.5004 & $+0.155$ & 494.4 & 392.7 & $1.3\times$\\
+\texttt{aki\_l32\_gate\_1500} & 1401 & 2.3277 & 2.0198 & $+0.308$ & 121.6 & 64.6 & $1.9\times$\\
+\texttt{aki\_d480\_h8\_speed\_gate} & 1451 & 1.9888 & 2.0188 & $-0.030$ & 207.8 & 64.4 & $3.2\times$\\
+\texttt{...aki30pct\_d480\_lowrank} & 1451 & 1.9920 & 2.0208 & $-0.029$ & 368.9 & 64.3 & $5.7\times$\\
+\bottomrule
+\end{tabular}
+\caption{Matched pairs (params/optimizer/data/seed). The only ``wins'' are
+$-0.03$ \bpb{} at $\sim$1450 steps --- inside optimization noise and bought at
+$3$--$6\times$ step cost. At the longest horizon the deficit is $+0.094$ \bpb{}
+against a $\sim2\times$ faster baseline, and the gap trend is stable, not
+closing.\protect\evid{docs/architecture/POST\_MORTEM\_WHY\_NON\_SOTA.md;
+results/aki\_gap\_trend\_20260510/}}
+\label{tab:matched}
+\end{table}
+
+Two readings matter. First, \emph{quality}: the deficit at 10k steps is stable
+(\texttt{gap\_trend.tsv}), so this is not a transient. Second, \emph{speed}:
+the architecture was pitched as sub-quadratic-therefore-faster, yet measured
+$1.3$--$5.7\times$ slower per step at practical sequence lengths --- the serial
+scan, folded rollout, sidecar memory, and gate machinery cost more wall-clock
+than the dense attention they replaced. The architecture was on the wrong side
+of the quality/speed frontier in every matched run: strictly dominated.
+
+Root cause, in one sentence: every mechanism in the family mixes the past
+through a fixed-width, content-agnostic bottleneck, while attention's
+content-based addressing over an unbounded cache is exactly what byte-level
+language modeling rewards at these scales.
+
+\section{How a leak survives months: methodology post-mortem}
+\label{sec:method}
+\begin{enumerate}
+  \item \textbf{Proxy-FLOPs fairness was fictional.} The contract used
+  $\mathrm{proxy\_flops} = 6 \cdot \mathrm{params} \cdot \mathrm{tokens}$,
+  which assumes a Transformer compute profile and is blind to serial per-token
+  cost. ``Matched FLOPs'' hid a $1.3$--$5.7\times$ wall-clock disadvantage.
+  \emph{Gate on wall-clock on identical hardware.}
+  \item \textbf{A mis-calibrated baseline manufactured false hope.} An early
+  ``$16\times$ convergence'' headline compared against a Transformer sitting at
+  cross-entropy $\approx 5.08$ after 800 steps --- barely below the
+  $\ln 256 \approx 5.55$ random floor for bytes, i.e.\ an under-tuned baseline.
+  Months of roadmap chased this artifact. \emph{Sanity-check the baseline
+  against known-good curves before comparing.}
+  \item \textbf{Micro-gate horizons.} Architectures were screened at 10-minute
+  /\ 1--2k-step gates where init and LR-schedule transients dominate; the only
+  ``wins'' in Table~\ref{tab:matched} live there, and vanish by 10k steps.
+  \item \textbf{Attribution chaos.} Runs toggled Engram, speculator, capsules,
+  MoE, feedback, kernels, halting, and schedules simultaneously; no run
+  isolated the architecture, so no gain was attributable and no loss
+  localizable.
+  \item \textbf{Stability-via-damping removed the thesis.} Each instability
+  was met with a clamp (gate max $0.35$, correction radius $0.30$, control
+  scale $0.015$, engine gain $0.20$), converging the novel block toward ``a
+  small residual tweak on the backbone'' --- quietly deleting the mechanism
+  that was supposed to win.
+  \item \textbf{The contaminated number became a CI gate.} The benchmark
+  contract enforces \texttt{max\_eval\_bpb: 0.35} --- a threshold only a leaky
+  model can meet at this scale --- institutionalizing the artifact as the
+  definition of success.\evid{configs/benchmarks/skc\_vs\_mamba\_vs\_transformers.json}
+  \item \textbf{The check that catches it in five minutes.} Train the smallest
+  model containing the new mixer on i.i.d.\ uniform tokens. Any validation
+  \bpb{} below $\log_2 V$ is proof of non-causality (Table~\ref{tab:oracle}).
+  We recommend this oracle as a standing pre-benchmark gate for any proposed
+  sequence mixer, alongside a perturbation probe (Test A) run on \emph{both}
+  the reference and accelerated kernel paths.
+\end{enumerate}
+
+\section{Related work}
+Non-causal spectral token mixing is well established for \emph{encoders}
+(e.g.\ Fourier-mixing architectures); the failure documented here arises
+specifically when such mixers are ported to autoregressive decoding behind a
+block-causal wrapper. State-space and long-convolution models obtain causal
+spectral mixing correctly via causal kernels/scans; our result is not evidence
+against those designs, only against unmasked in-block fast transforms. While
+ad-hoc probes of causal masking appear in engineering folklore, we are not
+aware of prior work formalizing a numeric perturbation-invariance
+\emph{certificate} of strict causality as a reusable, model-agnostic CI gate;
+we claim the certificate, and the perturbation analysis it packages, as
+original contributions of this work and release them at
+\texttt{https://github.com/Akhilesh-Gogikar/causal-certificate}. We keep
+citations minimal deliberately: an internal audit found earlier agent-generated
+prior-art lists unreliable, and we cite only what we have verified.
+
+\section{Limitations and scope}
+Results are at small scale (byte-level, $\le$125M-parameter class, sequence
+lengths where dense attention is fast); we do not claim the family is dominated
+at all scales, only that no evidence supports the original claims. The matched-run
+table is reproduced from the repository post-mortem; raw logs for three of the
+five rows predate the current branch, and we are regenerating the headline pair
+and the Triton-path leak confirmation on commodity cloud GPUs
+\todoev{RunPod matched gate + GPU/Triton Test A, this revision}.
+
+\section{Conclusion}
+The publishable value of this program is the autopsy: a precise, reproducible
+mechanism by which a blockwise fast transform silently reads the future, a
+demonstration that spectral gating makes such leaks \emph{trainable} rather
+than merely present, matched evidence that the honest architecture lost on both
+axes, and a five-minute oracle test that converts this class of error from a
+months-scale trap into a pre-flight check.
+
+\paragraph{Reproducibility.} \texttt{experiments/wht\_causality/} regenerates
+Tables~\ref{tab:oracle} and Test A on CPU in $\sim$35\,s. Matched-gate
+reproduction instructions: \texttt{docs/RUNPOD\_REPRO.md}.
+
+\end{document}
