@@ -78,6 +78,9 @@ and fires on an injected off-by-one mask and a batch-statistic coupling.
 
 ## Paper
 
+<!-- TODO(arXiv): replace XXXX.XXXXX with the assigned arXiv ID once announced -->
+**arXiv:** [arXiv:XXXX.XXXXX](https://arxiv.org/abs/XXXX.XXXXX) *(pending announcement)*
+
 The companion negative-results paper documenting the case study lives in
 [`paper/`](paper/):
 

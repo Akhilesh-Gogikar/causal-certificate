@@ -26,3 +26,17 @@ keywords:
   - data leakage
   - reproducibility
   - software testing
+preferred-citation:
+  type: article
+  title: "A Post-Mortem of a Spectral-Associative Language Model: How an In-Block Causality Leak Behind Its 7.2x Headline Result Was Caught by a Perturbation-Based Strict-Causality Certificate"
+  authors:
+    - family-names: Gogikar
+      given-names: Akhilesh
+      email: gogikar.akhilesh@gmail.com
+  year: 2026
+  # TODO(arXiv): fill in the assigned identifier once announced
+  identifiers:
+    - type: other
+      value: "arXiv:XXXX.XXXXX"
+      description: "arXiv preprint (placeholder - pending announcement)"
+  url: "https://arxiv.org/abs/XXXX.XXXXX"
